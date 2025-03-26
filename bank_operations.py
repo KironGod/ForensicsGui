@@ -1,10 +1,15 @@
 # bank_operations.py
+
 import os
-from cryptography.fernet import Fernet
 import logging
 import requests
 
-logging.basicConfig(filename='securebank.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(
+    filename='securebank.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class Item:
     def __init__(self, name, price, desc):
@@ -18,22 +23,24 @@ class BankAccount:
         self.ledger = []
         self.logged_in_user = None
 
-        # Initialize encryption
-        key = os.getenv('ENCRYPTION_KEY')
-        if not key:
-            raise ValueError("No encryption key found in environment variables")
-        self.cipher_suite = Fernet(key.encode())
-
     def _save_ledger_entry(self, entry):
         try:
-            response = requests.post('http://192.168.87.103:1020/save_ledger_entry', json={
-                'username': self.logged_in_user,
-                'entry': entry,
-                'balance': self.balance
-            })
+            response = requests.post(
+                'http://192.168.87.21:5000/save_ledger_entry',
+                json={
+                    'username': self.logged_in_user,
+                    'entry': entry,
+                    'balance': self.balance
+                }
+            )
             response.raise_for_status()
+            result = response.json()
+            if not result.get('success'):
+                logging.error(f"Failed to save ledger entry: {result.get('error')}")
+                raise Exception("Failed to save ledger entry to database")
         except requests.RequestException as error:
-            logging.error(f"Database error: {error}")
+            logging.error(f"Request error in _save_ledger_entry: {error}")
+            raise Exception("Failed to connect to server for ledger entry")
 
     def deposit(self, amount):
         if self.logged_in_user:
@@ -73,10 +80,13 @@ class BankAccount:
 
     def login(self, username, password):
         try:
-            response = requests.post('http://192.168.87.103:1020/login', json={
-                'username': username,
-                'password': password
-            })
+            response = requests.post(
+                'http://192.168.87.21:5000/login',
+                json={
+                    'username': username,
+                    'password': password
+                }
+            )
             response.raise_for_status()
             result = response.json()
             if result['success']:
@@ -105,20 +115,23 @@ class BankAccount:
 
 def register_user(username, password, age, first_name, last_name, account_type, account_number, card_number, credit_score, email, phone_number, address):
     try:
-        response = requests.post('http://192.168.87.103:1020/register_user', json={
-            'username': username,
-            'password': password,
-            'age': age,
-            'first_name': first_name,
-            'last_name': last_name,
-            'account_type': account_type,
-            'account_number': account_number,
-            'card_number': card_number,
-            'credit_score': credit_score,
-            'email': email,
-            'phone_number': phone_number,
-            'address': address
-        })
+        response = requests.post(
+            'http://192.168.87.21:5000/register_user',
+            json={
+                'username': username,
+                'password': password,
+                'age': age,
+                'first_name': first_name,
+                'last_name': last_name,
+                'account_type': account_type,
+                'account_number': account_number,
+                'card_number': card_number,
+                'credit_score': credit_score,
+                'email': email,
+                'phone_number': phone_number,
+                'address': address
+            }
+        )
         response.raise_for_status()
         result = response.json()
         if result['success']:
@@ -128,3 +141,4 @@ def register_user(username, password, age, first_name, last_name, account_type, 
     except requests.RequestException as error:
         logging.error(f"Database error: {error}")
         raise Exception("Failed to connect to database")
+
